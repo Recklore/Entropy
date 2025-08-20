@@ -1,0 +1,21 @@
+# C:\Users\amanc\OneDrive\Desktop\myenv\Scripts\activate
+
+
+# --- Core ML & Data Science ---
+torch
+# Download appropritate gpu version of pytorch based on your pc specifications
+# example isntall command: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu129   
+
+scikit-learn
+numpy
+pandas
+
+# --- LightRAG & Dependencies ---
+lightrag-hku[ollama,neo4j]
+python-dotenv
+faiss-cpu
+tqdm
+nest_asyncio
+
+# --- Document Parsing ---
+python-docx
