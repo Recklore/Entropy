@@ -6,6 +6,7 @@ torch
 # Download appropritate gpu version of pytorch based on your pc specifications
 # example isntall command: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu129   
 
+sentence-transformers
 scikit-learn
 numpy
 pandas
