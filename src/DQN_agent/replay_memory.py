@@ -1,7 +1,6 @@
 import random
-import torch
 from collections import deque, namedtuple
-from typing import Deque, List
+from typing import Deque
 
 Transition = namedtuple("Transition", ("state", "action", "next_state", "reward", "done"))
 

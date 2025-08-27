@@ -31,8 +31,11 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # DKTplus custom loss function
 def DKTplus_loss(model, y_pred, q_curr, q_next, r_curr, r_next, sequence_mask):
 
+    q_next_indexed = torch.clamp(q_next - 1, min=0)
+    q_curr_indexed = torch.clamp(q_curr - 1, min=0)
+
     # Prediction Loss Calcuation
-    y_pred_for_q_next = torch.gather(y_pred, 2, q_next.unsqueeze(2)).squeeze(-1)
+    y_pred_for_q_next = torch.gather(y_pred, 2, q_next_indexed.unsqueeze(2)).squeeze(-1)
     prediction_loss = nn.functional.binary_cross_entropy_with_logits(
         torch.masked_select(y_pred_for_q_next, sequence_mask),
         torch.masked_select(r_next, sequence_mask).float(),
@@ -40,7 +43,7 @@ def DKTplus_loss(model, y_pred, q_curr, q_next, r_curr, r_next, sequence_mask):
     )
 
     # Consistency Loss Calculation
-    y_pred_for_q_curr = torch.gather(y_pred, 2, q_curr.unsqueeze(2)).squeeze(-1)
+    y_pred_for_q_curr = torch.gather(y_pred, 2, q_curr_indexed.unsqueeze(2)).squeeze(-1)
     r_curr_float = r_curr.float()  # Check it out
     consistency_loss = nn.functional.binary_cross_entropy_with_logits(
         torch.masked_select(y_pred_for_q_curr, sequence_mask),
@@ -111,7 +114,8 @@ for epochs in range(EPOCHS):
         loss.backward()
         optimizer.step()
 
-        pred_for_q_next = torch.gather(y_pred, 2, q_next.unsqueeze(2)).squeeze(-1)
+        q_next_indexed = torch.clamp(q_next - 1, min=0)
+        pred_for_q_next = torch.gather(y_pred, 2, q_next_indexed.unsqueeze(2)).squeeze(-1)
         train_preds.append(torch.masked_select(pred_for_q_next, sequence_mask).detach().cpu().numpy())
         train_targets.append(torch.masked_select(r_next, sequence_mask).detach().cpu().numpy())
 
@@ -134,7 +138,8 @@ for epochs in range(EPOCHS):
 
             y_pred = model(q, r, t)
 
-            pred_for_q_next = torch.gather(y_pred, 2, q_next.unsqueeze(2)).squeeze(-1)
+            q_next_indexed = torch.clamp(q_next - 1, min=0)
+            pred_for_q_next = torch.gather(y_pred, 2, q_next_indexed.unsqueeze(2)).squeeze(-1)
             val_preds.append(torch.masked_select(pred_for_q_next, sequence_mask).detach().cpu().numpy())
             val_targets.append(torch.masked_select(r_next, sequence_mask).detach().cpu().numpy())
 

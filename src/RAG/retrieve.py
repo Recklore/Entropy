@@ -49,6 +49,7 @@ async def retrieve_content(rag, skill_name):
                 mode="mix",
                 top_k=10,
                 response_type="Multiple Paragraphs",
+                enable_rerank=False,
             ),
         )
 

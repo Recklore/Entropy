@@ -2,7 +2,6 @@ import torch
 import random
 import numpy as np
 from itertools import count
-from collections import namedtuple
 
 from src.DQN_agent.dqn import DQN
 from src.DQN_agent.replay_memory import replay_memory, Transition
