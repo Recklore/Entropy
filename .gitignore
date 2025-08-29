@@ -1,5 +1,6 @@
 .env
-data/*
-models/*
+data/assessment_database*
+data/ASSISTments/*.csv
+data/lightrag_database*
 
 **/__pycache__/

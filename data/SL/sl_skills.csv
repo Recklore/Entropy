@@ -1,0 +1,45 @@
+index,value
+1,Why Data is Important
+2,Statistical Learning vs Machine Learning
+3,Predictor and Response Variables
+4,Noise and Irreducible Error
+5,Reducible vs Irreducible Error
+6,Accuracy vs Interpretability
+7,Regression vs Classification
+8,Unsupervised and Semi-Supervised Learning
+9,Reinforcement Learning Overview
+10,Bias
+11,Variance
+12,Bias-Variance Decomposition
+13,Training vs Test Error
+14,Overfitting vs Underfitting
+15,Validation Set Approach
+16,K-Fold Cross Validation
+17,LOOCV
+18,Fairness in ML
+19,Feedback Loops and Societal Biases
+20,Simple Linear Regression
+21,Multiple Linear Regression
+22,Least Squares Estimation
+23,Interaction Terms
+24,Collinearity and VIF
+25,Heteroscedasticity and Residual Analysis
+26,Comparison: Linear Regression vs KNN
+27,Curse of Dimensionality
+28,Basis Expansions
+29,Ridge Regression and Lasso
+30,Piecewise Polynomials
+31,Natural and Smoothing Splines
+32,Kernel Smoothing Methods
+33,Local Linear Regression
+34,Bandwidth and Kernel Choice
+35,Multidimensional Kernel Smoothing
+36,Local Likelihood Estimation
+37,Bootstrap Methods
+38,Maximum Likelihood Estimation
+39,Bayesian Inference Basics
+40,"Prior, Posterior and Predictive Distribution"
+41,EM Algorithm Overview
+42,Handling Missing Data
+43,Bagging and Model Averaging
+44,Bayesian Model Averaging
