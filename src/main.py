@@ -2,17 +2,18 @@ import os
 import ast
 import time
 import random
-import ollama
 import sqlite3
 import asyncio
 import torch
 import pandas as pd
 import torch.nn as nn
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 from pydantic import BaseModel, conlist
 from lightrag import LightRAG, QueryParam
 from lightrag.utils import EmbeddingFunc
-from lightrag.llm.ollama import ollama_model_complete, ollama_embed
+from lightrag.llm.ollama import ollama_embed
 from lightrag.kg.shared_storage import initialize_pipeline_status
 
 from src.RAG.retrieve import generate_assessment, retrieve_content
@@ -28,10 +29,13 @@ os.environ["NEO4J_URI"] = os.getenv("NEO4J_URI")
 os.environ["NEO4J_USERNAME"] = os.getenv("NEO4J_USERNAME")
 os.environ["NEO4J_PASSWORD"] = os.getenv("NEO4J_PASSWORD")
 
-OLLAMA_HOST = os.getenv("LLM_BINDING_HOST")
-RETRIEVAL_LLM_MODEL = os.getenv("RETRIEVAL_LLM_MODEL")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_LLM_MODEL = os.getenv("GEMINI_MODEL_NAME")
+CLIENT = genai.Client(api_key=GEMINI_API_KEY)
+
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
 EMBEDDING_DIM = os.getenv("EMBEDDING_DIM")
+OLLAMA_HOST = os.getenv("OLLAMA_BINDING_HOST")
 
 DKT_PATH = "./models/DKT_model.pt"
 DQN_PATH = "./models/DQN_agent.pt"
@@ -56,16 +60,37 @@ def load_models(DKTplus_path="./models/DKT_model.pt", DQN_path="./models/DQN_age
         return None
 
 
+async def llm_model_func(prompt, system_prompt=None, history_messages=[], keyword_extraction=False, **kwargs):
+
+    client = CLIENT
+
+    if history_messages is None:
+        history_messages = []
+
+    combined_prompt = ""
+    if system_prompt:
+        combined_prompt += f"{system_prompt}\n"
+
+    for msg in history_messages:
+        combined_prompt += f"{msg['role']}: {msg['content']}\n"
+
+    combined_prompt += f"user: {prompt}"
+
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=[combined_prompt],
+        config=types.GenerateContentConfig(temperature=0.1),
+    )
+
+    return response.text
+
+
 async def initailise_rag(working_dir, llm_model, embed_model, embed_dim, ollama_host):
 
     rag = LightRAG(
         working_dir=working_dir,
-        llm_model_func=ollama_model_complete,
+        llm_model_func=llm_model_func,
         llm_model_name=llm_model,
-        llm_model_kwargs={
-            "host": ollama_host,
-            "options": {"num_ctx": 32768},
-        },
         embedding_func=EmbeddingFunc(
             embedding_dim=int(embed_dim),
             max_token_size=8192,
@@ -111,7 +136,7 @@ async def main():
     dkt, dqn = load_models(DKT_PATH, DQN_PATH)
 
     print("Initailising RAG mechanism...")
-    rag = await initailise_rag(LIGHTRAG_WORKING_DIR, RETRIEVAL_LLM_MODEL, EMBEDDING_MODEL, EMBEDDING_DIM, OLLAMA_HOST)
+    rag = await initailise_rag(LIGHTRAG_WORKING_DIR, GEMINI_LLM_MODEL, EMBEDDING_MODEL, EMBEDDING_DIM, OLLAMA_HOST)
 
     print("Loading skill list...")
     skill_to_index, index_to_skill = load_skills(SKILLS_PATH)
@@ -120,7 +145,9 @@ async def main():
 
     os.system(CLEAR_COMMAND)
     print(f"Generating {student_name}'s first assessment...", end="", flush=True)
-    first_assestment = ast.literal_eval(generate_assessment(num_q=5))["questions"]
+    first_assestment = ast.literal_eval(generate_assessment(client=CLIENT, model_name=GEMINI_LLM_MODEL, num_q=5))[
+        "questions"
+    ]
 
     q, r, t = [], [], []
     countdown(5)
@@ -205,7 +232,14 @@ async def main():
 
         os.system(CLEAR_COMMAND)
         print(f"Generating {student_name}'s assessment for skill {selected_skill}...", end="", flush=True)
-        skill_assestment = ast.literal_eval(generate_assessment(skill_name=selected_skill, num_q=2))["questions"]
+        skill_assestment = ast.literal_eval(
+            generate_assessment(
+                client=CLIENT,
+                model_name=GEMINI_LLM_MODEL,
+                skill_name=selected_skill,
+                num_q=2,
+            )
+        )["questions"]
 
         countdown(5)
         for i, question in enumerate(skill_assestment, 1):

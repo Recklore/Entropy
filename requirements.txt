@@ -13,3 +13,6 @@ pandas
 lightrag-hku[ollama,neo4j]
 python-dotenv
 faiss-cpu
+
+# --- Google-Gemini ---
+google-genai

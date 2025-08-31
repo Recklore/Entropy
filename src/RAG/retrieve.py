@@ -1,6 +1,7 @@
 import sqlite3
 import random
-import ollama
+from google import genai
+from google.genai import types
 from typing import Annotated
 from pydantic import BaseModel, Field
 from lightrag import QueryParam
@@ -19,27 +20,38 @@ class Questions(BaseModel):
 async def retrieve_content(rag, skill_name):
 
     prompt = f"""
-    Provide a comprehensive and technically precise explanation of '{skill_name}', suitable for a university student studying statistical learning. Use the retrieved context to structure your answer into the following sections:
+    You are an expert AI Tutor specializing in statistical learning and machine learning. Your task is to generate a comprehensive, technically precise, and well-structured educational guide on the topic of '{skill_name}'.
 
-    1.  **Fundamental Concept & Purpose**:
-        - Clearly define what '{skill_name}' is.
-        - Explain its primary purpose and why it is important in the context of statistical or machine learning.
+    The target audience is a university student, so the explanation must be clear, rigorous, and build strong intuition.
 
-    2.  **Technical Breakdown & Mechanism**:
-        - Describe the core mechanism or process.
-        - For a model (e.g., Linear Regression), explain how it is estimated or trained.
-        - For a concept (e.g., Bias-Variance Tradeoff), explain its components and their relationship.
-        - For a method (e.g., K-Fold Cross Validation), explain the step-by-step procedure.
+    Use the provided context to generate the response, but synthesize it into the following structure. **The entire output must be in Markdown format.**
 
-    3.  **Application & Interpretation**:
-        - Discuss the practical applications. When and where is this used?
-        - Explain how to interpret the results or outcomes associated with '{skill_name}'. This can include model metrics, diagnostic plots, or the implications of a concept.
+    ---
 
-    4.  **Challenges & Key Considerations**:
-        - Outline common challenges, limitations, or potential pitfalls.
-        - Discuss any important assumptions, trade-offs, or nuances to be aware of when applying or considering '{skill_name}'.
+    ## {skill_name}: A Comprehensive Guide
 
-    Please synthesize a clear, well-structured, and complete response based on the information provided.
+    ### 1. Fundamental Concept & Purpose
+    - **Definition:** Clearly define what '{skill_name}' is in the context of statistical learning.
+    - **Purpose and Importance:** Explain its primary goal. Why is it used? What fundamental problem does it solve or what question does it answer?
+    - **Intuitive Analogy:** Provide a simple, real-world analogy to help build intuition around the core idea.
+
+    ### 2. Core Mathematical and Algorithmic Details
+    - **Mechanism:** Describe the core mathematical or algorithmic process. Use LaTeX for all mathematical notations, equations, and symbols (e.g., enclose inline math in `$` and display equations in `$$`).
+    - **Step-by-Step Example:** If applicable (e.g., for a method like K-Fold CV or an algorithm like Gradient Descent), provide a simple, step-by-step numerical example to illustrate the process.
+    - **Key Parameters:** Explain any important parameters, hyperparameters, or components involved.
+
+    ### 3. Practical Application & Interpretation
+    - **Use Cases:** Discuss common practical applications and real-world scenarios where '{skill_name}' is applied.
+    - **Interpreting Results:** Explain how to interpret the outcomes. This could include model coefficients, performance metrics (e.g., $R^2$, AUC, F1-score), diagnostic plots (e.g., residual plots), or the implications of a concept like the bias-variance tradeoff.
+
+    ### 4. Assumptions, Strengths, and Limitations
+    - **Key Assumptions:** List and explain the critical assumptions that must hold for '{skill_name}' to be applied correctly and effectively.
+    - **Strengths:** What are the main advantages of using this method or concept?
+    - **Limitations & Pitfalls:** Outline common challenges, limitations, or potential pitfalls. When might it perform poorly or give misleading results?
+
+    ---
+
+    Ensure the final output is a single, coherent, and well-formatted Markdown document that directly follows this structure.
     """
 
     try:
@@ -60,7 +72,8 @@ async def retrieve_content(rag, skill_name):
 
 def generate_assessment(
     skill_name=None,
-    model_name="mistral:7b-instruct",
+    client=None,
+    model_name="gemini-2.5-flash",
     database_path="./data/assessment_database/Questions.db",
     num_q=None,
 ):
@@ -109,11 +122,13 @@ def generate_assessment(
                 + ",".join(f"{question}" for question in questions)
                 + f"\n\nUsing the above as examples, generate {num_q if num_q else "20"} new diverse questions across these skills"
             )
-    response = ollama.chat(
+
+    response = client.models.generate_content(
         model=model_name,
-        messages=[{"role": "user", "content": prompt}],
-        format=Questions.model_json_schema(),
-        options={"temperature": 0.4},
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            temperature=0.1, response_mime_type="application/json", response_schema=Questions
+        ),
     )
 
-    return response["message"]["content"]
+    return response.text
