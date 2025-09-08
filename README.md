@@ -1,5 +1,5 @@
 
-# Entropi-Learning: An AI-Powered Personalized Learning System
+# Entropy-Learning: An AI-Powered Personalized Learning System
 
 This repository contains the source code for an AI-powered personalized learning system that dynamically adapts to a student's knowledge level. The system integrates a student knowledge model (DKTplus), a reinforcement learning-based policy agent (DQN), and a retrieval-augmented generation (RAG) component (LightRAG) to recommend learning materials and assessments tailored to individual student needs.
 
@@ -55,7 +55,7 @@ The training process is sequential and prepares all the necessary components for
 
 ### Inference Pipeline
 
-The inference pipeline represents the live, interactive learning loop that the user experiences when running `src/main.py`.
+The inference pipeline represents the live, interactive learning loop that the user experiences when running `app.py`.
 
 **Flow:** `Student Interaction` -> `DKTplus` -> `DQN` -> `LightRAG` -> `Student Interaction`
 
@@ -103,8 +103,8 @@ The inference pipeline represents the live, interactive learning loop that the u
     -   `generate_assessment(...)`: Generates assessment questions for a given skill or a set of skills.
 
 ### Main Application
--   **File**: `src/main.py`
--   **Description**: This is the main entry point of the application. It loads the trained models, initializes the RAG system, and runs the interactive learning loop with the user.
+-   **File**: `app.py`
+-   **Description**: This is the main entry point of the application. It loads the trained models, initializes the RAG system, and runs the interactive learning loop with the user through a Streamlit web interface.
 
 ## Data & Preprocessing
 
@@ -133,6 +133,7 @@ The project uses two main data sources:
 The following Python packages are required to run the project. They are listed in `requirements.txt`.
 
 ```
+streamlit
 torch
 sentence-transformers
 scikit-learn
@@ -191,13 +192,13 @@ faiss-cpu
 
 ## Quickstart
 
-To run the interactive learning application, execute the `main.py` script:
+To run the interactive learning application, execute the `app.py` script using Streamlit:
 
 ```shell
-python src/main.py
+streamlit run app.py
 ```
 
-The application will guide you through an initial assessment, and then enter a loop of recommending skills, providing content, and assessing your knowledge.
+The application will open in your web browser, guide you through an initial assessment, and then enter a loop of recommending skills, providing content, and assessing your knowledge.
 
 ## Training
 
@@ -234,9 +235,45 @@ The training process is divided into two stages: training the DKTplus model and 
     -   `LEARNING_RATE = 0.0001`
 -   **Output**: The trained DQN agent is saved to `models/DQN_agent.pt`.
 
+## Evaluation and Model Details
+
+### DKTplus Model Details and Performance
+
+The DKTplus model is trained using a custom loss function designed to improve performance and stability. The loss is a combination of three components:
+-   **Prediction Loss**: The primary loss function, which is the standard binary cross-entropy for predicting the student's correctness on the next question.
+-   **Consistency Loss**: A regularization term that encourages the model's prediction for the *current* question to be consistent with the actual outcome, helping the model make better use of the immediate context.
+-   **Smoothness Loss**: Two regularization terms (L1 and L2) that penalize large fluctuations in the predicted mastery levels between consecutive time steps. This encourages the model to represent student knowledge as a smooth, continuous process.
+
+After 25 epochs of training, the model achieves the following performance on the validation set:
+-   **Final Validation Accuracy**: 72.92%
+-   **Final Validation AUC**: 0.7115
+
+**Note**: After experimenting with various hyperparameters and LSTM architectures, the model's accuracy consistently plateaus around 73% for both training and validation sets. The current configuration was chosen as it achieves this peak performance with minimal signs of overfitting.
+
+### DQN Agent Performance
+
+The DQN agent's effectiveness is evaluated by comparing it against a simple baseline policy that always chooses the skill with the lowest mastery. Both agents were run for 50 episodes in a simulated student environment.
+
+The results show that the DQN agent significantly outperforms the baseline:
+
+| Agent | Average Reward | Average Mastery Gain |
+| :--- | :--- | :--- |
+| **DQN Agent** | 91.46 | 26.72 |
+| **Baseline Agent** | -63.41 | 22.29 |
+
+-   **Reward Improvement (DQN vs Baseline)**: +244.25%
+-   **Mastery Gain Improvement (DQN vs Baseline)**: +19.86%
+
+### Potential Reasons for Performance Limitations
+
+The DKTplus model's accuracy is robust but has a performance ceiling. Potential reasons for this include:
+-   **Skill Mapping Ambiguity**: The skills from the public ASSISTments dataset are mapped to the project's internal skill set using semantic similarity. While effective, this can introduce noise, as skills that are textually similar may not be pedagogically identical.
+-   **Probabilistic Mapping**: The mapping process is probabilistic, meaning a single ASSISTments skill can sometimes be mapped to different internal skills across the dataset. This adds a layer of randomness that can create a soft ceiling on performance.
+-   **Feature Limitations**: The model uses a limited feature set (skill, correctness, time taken). It does not account for other factors like hint usage, number of attempts, or the prerequisite relationships between skills, which could provide a richer signal for knowledge tracing.
+
 ## Inference
 
-The `src/main.py` script demonstrates how to load the trained models and run the full inference pipeline. The core logic is as follows:
+The `app.py` script demonstrates how to load the trained models and run the full inference pipeline within a Streamlit application. The core logic is as follows:
 
 1.  **Load Models**: The `load_models` function loads the `DKT_model.pt` and `DQN_agent.pt` files.
 2.  **Get Student Mastery**: The DKTplus model is used to get the student's mastery vector from their interaction history.
@@ -254,7 +291,7 @@ The main configuration for the application is managed through environment variab
 -   `EMBEDDING_MODEL`: The model to use for text embeddings.
 -   `EMBEDDING_DIM`: The dimension of the embeddings.
 
-Model paths and other constants are defined at the top of the respective Python scripts (`src/main.py`, `src/DKTplus/train.py`, etc.).
+Model paths and other constants are defined at the top of the respective Python scripts (`app.py`, `src/DKTplus/train.py`, etc.).
 
 ## Troubleshooting
 
@@ -265,9 +302,9 @@ Model paths and other constants are defined at the top of the respective Python 
 
 ## References
 
--   **DKTplus**: The implementation is based on the principles of Deep Knowledge Tracing.
--   **DQN**: The DQN agent is based on the work by Mnih et al., "Playing Atari with Deep Reinforcement Learning".
--   **LightRAG**: A lightweight and modular RAG framework.
+-   **DKTplus**: The DKTplus model implementation is adapted from the excellent [pyKT (Python library for Knowledge Tracing)](https://github.com/pykt-team/pykt-toolkit) library.
+-   **DQN**: The DQN agent is based on the work by Mnih et al., ["Playing Atari with Deep Reinforcement Learning"](https://www.cs.toronto.edu/~vmnih/docs/dqn.pdf).
+-   **LightRAG**: This project uses [LightRAG](https://github.com/hku-nlp/lightrag), a lightweight and modular RAG framework.
 -   **ASSISTments Dataset**: A public dataset for research in student learning.
 
 ## Assumptions

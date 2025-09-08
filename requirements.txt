@@ -16,3 +16,6 @@ faiss-cpu
 
 # --- Google-Gemini ---
 google-genai
+
+# --- WEB interface ---
+streamlit
