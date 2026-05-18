@@ -10,12 +10,15 @@ numpy
 pandas
 
 # --- LightRAG & Dependencies ---
-lightrag-hku[ollama,neo4j]
+lightrag-hku[neo4j]
 python-dotenv
 faiss-cpu
 
-# --- Google-Gemini ---
+# --- Google-Gemini Embeddings ---
 google-genai
+
+# --- Groq ---
+groq
 
 # --- WEB interface ---
 streamlit

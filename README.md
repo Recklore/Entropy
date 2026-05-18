@@ -140,9 +140,11 @@ scikit-learn
 pydantic
 numpy
 pandas
-lightrag-hku[ollama,neo4j]
+lightrag-hku[neo4j]
 python-dotenv
 faiss-cpu
+google-genai
+groq
 ```
 
 ## Installation
@@ -154,13 +156,10 @@ faiss-cpu
     ```
 
 2.  **Set up external services**:
-    This project requires Neo4j and Ollama to be running.
-    -   **Neo4j**: Start a Neo4j database.
-    -   **Ollama**: Ensure the Ollama service is running and the required models are pulled.
-        ```shell
-        ollama pull mistral:7b-instruct
-        ollama pull bgm-m3:567m
-        ```
+    This project requires Neo4j (cloud or self-hosted) and API access for Groq and Gemini embeddings.
+    -   **Neo4j**: Provision a cloud database and note the URI, username, and password.
+    -   **Groq**: Create an API key for LLM completions.
+    -   **Gemini**: Create an API key for embeddings.
 
 3.  **Create a Python virtual environment and install dependencies**:
     ```shell
@@ -173,13 +172,14 @@ faiss-cpu
 4.  **Set up environment variables**:
     Create a `.env` file in the root of the project and add the following variables:
     ```
-    NEO4J_URI="bolt://localhost:7687"
-    NEO4J_USERNAME="neo4j"
+    NEO4J_URI="neo4j+s://<your-cloud-uri>"
+    NEO4J_USERNAME="your_neo4j_username"
     NEO4J_PASSWORD="your_neo4j_password"
-    LLM_BINDING_HOST="http://localhost:11434"
-    RETRIEVAL_LLM_MODEL="mistral:7b-instruct"
-    EMBEDDING_MODEL="nomic-embed-text"
-    EMBEDDING_DIM="768"
+    GROQ_API_KEY="your_groq_api_key"
+    GROQ_MODEL_NAME="llama-3.3-70b-versatile"
+    GEMINI_API_KEY="your_gemini_api_key"
+    GEMINI_EMBED_MODEL="gemini-embedding-001"
+    EMBEDDING_DIM="1024"
     ```
 
 5.  **Prepare the data and knowledge base**:
@@ -286,9 +286,8 @@ The `app.py` script demonstrates how to load the trained models and run the full
 The main configuration for the application is managed through environment variables in the `.env` file.
 
 -   `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`: Credentials for the Neo4j database.
--   `LLM_BINDING_HOST`: The host for the Ollama LLM service.
--   `RETRIEVAL_LLM_MODEL`: The LLM model to use for retrieval and generation.
--   `EMBEDDING_MODEL`: The model to use for text embeddings.
+-   `GROQ_API_KEY`, `GROQ_MODEL_NAME`: Groq credentials and the LLM model used for generation.
+-   `GEMINI_API_KEY`, `GEMINI_EMBED_MODEL`: Gemini credentials and the embedding model used for vectorization.
 -   `EMBEDDING_DIM`: The dimension of the embeddings.
 
 Model paths and other constants are defined at the top of the respective Python scripts (`app.py`, `src/DKTplus/train.py`, etc.).
@@ -297,7 +296,7 @@ Model paths and other constants are defined at the top of the respective Python 
 
 -   **GPU/CPU Issues**: The system will automatically use a GPU if `torch.cuda.is_available()` is true. If you encounter CUDA errors, ensure your PyTorch installation matches your CUDA version, or force CPU usage by setting `DEVICE = "cpu"`.
 -   **Missing Data Paths**: If you get `FileNotFoundError`, make sure you have run the `data_preprocessing.ipynb` notebook and the `lightrag_setup.py` script.
--   **Ollama/Neo4j Connection Errors**: Ensure that the Ollama and Neo4j services are running and that the credentials in your `.env` file are correct.
+-   **Groq/Gemini/Neo4j Connection Errors**: Ensure that your API keys are valid and that the Neo4j cloud credentials in your `.env` file are correct.
 -   **RAG Index Issues**: If the RAG system is not returning good results, you may need to rebuild the index by deleting the contents of the `data/lightrag_database` directory and re-running `src/RAG/lightrag_setup.py`.
 
 ## References
@@ -313,7 +312,7 @@ Here are the assumptions I made while generating this README:
 
 -   The project requires Python 3.
 -   The user has `git` and `python` installed.
--   The user is familiar with setting up services like Neo4j and Ollama.
+-   The user is familiar with setting up services like Neo4j and API credentials for Groq and Gemini.
 -   No formal test suite or CI/CD pipeline exists.
 -   The project does not have a `LICENSE` file.
 -   The primary goal of the user is to run the interactive learning application.

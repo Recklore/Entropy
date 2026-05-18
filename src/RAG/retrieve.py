@@ -1,7 +1,6 @@
+import json
 import sqlite3
 import random
-from google import genai
-from google.genai import types
 from typing import Annotated
 from pydantic import BaseModel, Field
 from lightrag import QueryParam
@@ -73,7 +72,7 @@ async def retrieve_content(rag, skill_name):
 def generate_assessment(
     skill_name=None,
     client=None,
-    model_name="gemini-2.5-flash",
+    model_name="llama-3.3-70b-versatile",
     database_path="./data/assessment_database/Questions.db",
     num_q=None,
 ):
@@ -123,12 +122,25 @@ def generate_assessment(
                 + f"\n\nUsing the above as examples, generate {num_q if num_q else "20"} new diverse questions across these skills"
             )
 
-    response = client.models.generate_content(
-        model=model_name,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            temperature=0.1, response_mime_type="application/json", response_schema=Questions
-        ),
+    if client is None:
+        raise ValueError("Groq client is required for assessment generation.")
+
+    system_prompt = (
+        "You are a precise JSON generator. Return ONLY valid JSON with the following schema: "
+        f"{Questions.model_json_schema()}. Do not include markdown or commentary."
     )
 
-    return response.text
+    response = client.chat.completions.create(
+        model=model_name,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.1,
+        response_format={"type": "json_object"},
+    )
+
+    content = response.choices[0].message.content
+    payload = json.loads(content)
+    Questions.model_validate(payload)
+    return json.dumps(payload)

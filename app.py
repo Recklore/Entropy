@@ -1,6 +1,6 @@
 import streamlit as st
 import os
-import ast
+import json
 import time
 import random
 import sqlite3
@@ -9,13 +9,11 @@ import torch
 import pandas as pd
 import torch.nn as nn
 from google import genai
-from google.genai import types
 from dotenv import load_dotenv
-from pydantic import BaseModel, conlist
-from lightrag import LightRAG, QueryParam
+from lightrag import LightRAG
 from lightrag.utils import EmbeddingFunc
-from lightrag.llm.ollama import ollama_embed
 from lightrag.kg.shared_storage import initialize_pipeline_status
+from groq import Groq
 
 from src.RAG.retrieve import generate_assessment, retrieve_content
 
@@ -31,12 +29,14 @@ os.environ["NEO4J_USERNAME"] = os.getenv("NEO4J_USERNAME")
 os.environ["NEO4J_PASSWORD"] = os.getenv("NEO4J_PASSWORD")
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_LLM_MODEL = os.getenv("GEMINI_MODEL_NAME")
-CLIENT = genai.Client(api_key=GEMINI_API_KEY)
+GEMINI_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL", "gemini-embedding-001")
+GEMINI_CLIENT = genai.Client(api_key=GEMINI_API_KEY)
 
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_MODEL_NAME = os.getenv("GROQ_MODEL_NAME", "llama-3.3-70b-versatile")
+GROQ_CLIENT = Groq(api_key=GROQ_API_KEY)
+
 EMBEDDING_DIM = os.getenv("EMBEDDING_DIM")
-OLLAMA_HOST = os.getenv("OLLAMA_BINDING_HOST")
 
 DKT_PATH = "./models/DKT_model.pt"
 DQN_PATH = "./models/DQN_agent.pt"
@@ -65,8 +65,14 @@ def load_skills(path=SKILLS_PATH):
     return skill_to_index, index_to_skill
 
 
+def embed_texts(texts, client, model_name):
+    if isinstance(texts, str):
+        texts = [texts]
+    response = client.models.embed_content(model=model_name, contents=texts)
+    return [embedding.values for embedding in response.embeddings]
+
+
 async def llm_model_func(prompt, system_prompt=None, history_messages=[], keyword_extraction=False, **kwargs):
-    client = CLIENT
     if history_messages is None:
         history_messages = []
     combined_prompt = ""
@@ -75,23 +81,24 @@ async def llm_model_func(prompt, system_prompt=None, history_messages=[], keywor
     for msg in history_messages:
         combined_prompt += f"{msg['role']}: {msg['content']}\n"
     combined_prompt += f"user: {prompt}"
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=[combined_prompt],
-        config=types.GenerateContentConfig(temperature=0.1),
+
+    response = GROQ_CLIENT.chat.completions.create(
+        model=GROQ_MODEL_NAME,
+        messages=[{"role": "user", "content": combined_prompt}],
+        temperature=0.1,
     )
-    return response.text
+    return response.choices[0].message.content
 
 
 @st.cache_resource
-def initailise_rag_sync(working_dir, llm_model, embed_model, embed_dim, ollama_host):
+def initailise_rag_sync(working_dir, llm_model, embed_model, embed_dim):
     asyncio.set_event_loop(st.session_state.loop)
     return st.session_state.loop.run_until_complete(
-        initailise_rag(working_dir, llm_model, embed_model, embed_dim, ollama_host)
+        initailise_rag(working_dir, llm_model, embed_model, embed_dim)
     )
 
 
-async def initailise_rag(working_dir, llm_model, embed_model, embed_dim, ollama_host):
+async def initailise_rag(working_dir, llm_model, embed_model, embed_dim):
     rag = LightRAG(
         working_dir=working_dir,
         llm_model_func=llm_model_func,
@@ -99,11 +106,7 @@ async def initailise_rag(working_dir, llm_model, embed_model, embed_dim, ollama_
         embedding_func=EmbeddingFunc(
             embedding_dim=int(embed_dim),
             max_token_size=8192,
-            func=lambda texts: ollama_embed(
-                texts,
-                embed_model=embed_model,
-                host=ollama_host,
-            ),
+            func=lambda texts: embed_texts(texts, GEMINI_CLIENT, embed_model),
         ),
         rerank_model_func=None,
         graph_storage="Neo4JStorage",
@@ -239,7 +242,7 @@ def main():
     # --- Load Models and Data ---
     dkt, dqn = load_models(DKT_PATH, DQN_PATH)
     skill_to_index, index_to_skill = load_skills(SKILLS_PATH)
-    rag = initailise_rag_sync(LIGHTRAG_WORKING_DIR, GEMINI_LLM_MODEL, EMBEDDING_MODEL, EMBEDDING_DIM, OLLAMA_HOST)
+    rag = initailise_rag_sync(LIGHTRAG_WORKING_DIR, GROQ_MODEL_NAME, GEMINI_EMBED_MODEL, EMBEDDING_DIM)
 
     # --- Sidebar ---
     if st.session_state.mastery is not None:
@@ -306,8 +309,8 @@ def main():
                 st.session_state.view = "dashboard"
                 st.rerun()
             with st.spinner("Generating your first assessment..."):
-                first_assessment = ast.literal_eval(
-                    generate_assessment(client=CLIENT, model_name=GEMINI_LLM_MODEL, num_q=5)
+                first_assessment = json.loads(
+                    generate_assessment(client=GROQ_CLIENT, model_name=GROQ_MODEL_NAME, num_q=5)
                 )["questions"]
                 st.session_state.questions = first_assessment
                 st.session_state.student_answers = [None] * len(first_assessment)
@@ -448,10 +451,10 @@ def main():
         st.markdown(st.session_state.content)
         if st.button("Start Skill Assessment"):
             with st.spinner(f"Generating assessment for {st.session_state.selected_skill}..."):
-                skill_assessment = ast.literal_eval(
+                skill_assessment = json.loads(
                     generate_assessment(
-                        client=CLIENT,
-                        model_name=GEMINI_LLM_MODEL,
+                        client=GROQ_CLIENT,
+                        model_name=GROQ_MODEL_NAME,
                         skill_name=st.session_state.selected_skill,
                         num_q=2,
                     )
